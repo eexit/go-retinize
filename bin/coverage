@@ -1,0 +1,42 @@
+#!/bin/sh
+# Source: https://github.com/mlafeldt/chef-runner/blob/master/script/coverage
+#
+# Generate test coverage statistics for Go packages.
+#
+# Works around the fact that `go test -coverprofile` currently does not work
+# with multiple packages, see https://code.google.com/p/go/issues/detail?id=6909
+#
+# Usage: script/coverage [--html]
+#
+#     --html      Additionally create HTML report and open it in browser
+#
+
+set -e
+
+workdir=coverage
+profile="$workdir/cover.out"
+mode=atomic
+
+generate_cover_data() {
+    rm -rf "$workdir"
+    mkdir "$workdir"
+
+    for pkg in "$@"; do
+        f="$workdir/$(echo $pkg | tr / -).cover"
+        go test -race -covermode="$mode" -coverprofile="$f" "$pkg"
+    done
+
+    echo "mode: $mode" >"$profile"
+    grep -h -v "^mode:" "$workdir"/*.cover >>"$profile"
+}
+
+generate_cover_data $(go list github.com/cbdr/ofccp-storage-api/... | grep -v /vendor)
+go tool cover -func="$profile"
+case "$1" in
+"")
+    ;;
+--html)
+    go tool cover -html="$profile" -o "$workdir/index.html" ;;
+*)
+    echo >&2 "error: invalid option: $1"; exit 1 ;;
+esac
