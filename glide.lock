@@ -1,6 +1,20 @@
-hash: e6a900075424380ac9b8fdea053540b1e57a56f9689c9eb361b019bc7af9223e
-updated: 2017-07-07T17:38:21.598422157+02:00
+hash: d01e67c666a95c79178d14c691da2493e4353d9c3483bf0e514eda3a0fbbe06c
+updated: 2017-07-26T23:41:16.273102501+02:00
 imports:
+- name: github.com/mattn/go-colorable
+  version: 3fa8c76f9daed4067e4a806fb7e4dc86455c6d6a
+- name: github.com/mattn/go-isatty
+  version: fc9e8d8ef48496124e79ae0df75490096eccf6fe
+- name: github.com/mgutz/ansi
+  version: 9520e82c474b0a04dd04f8a40959027271bab992
+- name: github.com/sirupsen/logrus
+  version: a3f95b5c423586578a4e099b11a46c2479628cac
+- name: github.com/x-cray/logrus-prefixed-formatter
+  version: 0b2c791a02f18788b281dc30e243a0632dad695b
+- name: golang.org/x/sys
+  version: 02a66801d979d706a4b445e24e03916eeaa2a404
+  subpackages:
+  - unix
 - name: gopkg.in/urfave/cli.v2
   version: 0bdeddeeb0f650497d603c4ad7b20cfe685682f6
 testImports: []

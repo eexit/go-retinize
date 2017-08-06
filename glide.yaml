@@ -2,3 +2,7 @@ package: github.com/eexit/go-retinize
 import:
 - package: gopkg.in/urfave/cli.v2
   version: ^1.19.1
+- package: github.com/sirupsen/logrus
+  version: ^1.0.2
+- package: github.com/x-cray/logrus-prefixed-formatter
+  version: ^0.5.0
