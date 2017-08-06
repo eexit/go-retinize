@@ -1,70 +1,114 @@
 package main
 
 import (
-	"os"
-
+	"errors"
 	"fmt"
-	"github.com/eexit/go-retinize/resizer"
+	"github.com/eexit/go-retinize/retinize"
+	"github.com/sirupsen/logrus"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"gopkg.in/urfave/cli.v2"
+	"os"
+	"reflect"
 )
 
-const VERSION = "0.1.0-dev"
-
 func main() {
-	var factor, baseWidth, baseHeight int
+	params := retinize.Params{}
+	var logLevel, logFormat string
 
 	app := cli.NewApp()
 	app.Name = "retinize"
-	app.Version = VERSION
-	app.Usage = "Automate down-scaling of images to target lower resolution or non-retina screens"
+	app.Version = retinize.VERSION
+	app.Usage = "Automate down-scaling of images to target lower resolution on non-retina screens"
 	app.UsageText = "retinize [global options...] arguments..."
 	app.Flags = []cli.Flag{
 		cli.IntFlag{
 			Name:        "factor",
 			Usage:       "Highest retinal scaling factor (e.g. 2 -> @2x, 3 -> @3x)",
-			Value:       2,
-			Destination: &factor,
+			Destination: &params.Factor,
 		},
 		cli.IntFlag{
-			Name:        "base-width",
+			Name:        "width",
 			Usage:       "Non-retina base image width. Up-scaled images will have {factor} * {base-width} width",
-			Destination: &baseWidth,
+			Destination: &params.Width,
 		},
-		cli.IntFlag{
-			Name:        "base-height",
-			Usage:       "Non-retina base image height. Up-scaled images will have {factor} * {base-height} height",
-			Destination: &baseHeight,
+		cli.BoolFlag{
+			Name:        "keep-src",
+			Usage:       "Makes a copy to the original file instead of resizing (default = false)",
+			Destination: &params.BackupSrc,
+		},
+		cli.StringFlag{
+			Name:        "log-level",
+			Usage:       "Set log verbosity",
+			Value:       "debug",
+			Destination: &logLevel,
+		},
+		cli.StringFlag{
+			Name:        "log-format",
+			Usage:       "Set log output format (text or json)",
+			Value:       "text",
+			Destination: &logFormat,
 		},
 	}
-	app.Action = func(c *cli.Context) error {
-		fmt.Printf("Images: %s\n", c.Args())
-		return retinize()
+	app.Action = func(ctx *cli.Context) error {
+		if ctx.Int("width") == 0 {
+			return cli.NewExitError("Missing --width flag", 1)
+		}
+
+		if ctx.Int("width") < 0 {
+			return cli.NewExitError("Invalid --width flag value", 2)
+		}
+
+		err := configureLogger(logLevel, logFormat)
+		if err != nil {
+			return cli.NewExitError(err, 1)
+		}
+
+		retinize.Retinize(params, ctx.Args())
+
+		return nil
 	}
 
 	app.Run(os.Args)
 }
 
-func retinize() error {
-	r := resolveResizer(
-		resizer.NewSipsResizer(),    // macOS scriptable image processing system
-		resizer.NewConvertResizer(), // ImageMagik image converter
-	)
+func configureLogger(level, format string) error {
+	ll, err := logrus.ParseLevel(level)
+	if err != nil {
+		return errors.New(fmt.Sprintf("Invalid log level \"%s\"", level))
+	}
 
-	fmt.Printf("%+v\n", r)
+	// Sets the log level before the formatter because the formatter might add some
+	// extra options according to the log level
+	logrus.SetLevel(ll)
+
+	formatter, err := resolveFormatter(format)
+	if err != nil {
+		return err
+	}
+
+	logrus.SetFormatter(formatter)
+
+	logrus.WithFields(logrus.Fields{
+		"prefix":    "main",
+		"level":     ll,
+		"formatter": reflect.Indirect(reflect.ValueOf(formatter)).Type().Name(),
+	}).Info("Logger configuration")
+
 	return nil
 }
 
-func resolveResizer(resizers ...resizer.Resizer) resizer.Resizer {
-	installed := make(chan resizer.Resizer)
-	defer close(installed)
+func resolveFormatter(format string) (logrus.Formatter, error) {
+	switch format {
+	case "text":
+		formatter := new(prefixed.TextFormatter)
 
-	for _, rs := range resizers {
-		go func(rs resizer.Resizer) {
-			if rs.IsInstalled() {
-				installed <- rs
-			}
-		}(rs)
+		if logrus.GetLevel() == logrus.DebugLevel {
+			formatter.FullTimestamp = true
+		}
+		return formatter, nil
+	case "json":
+		return new(logrus.JSONFormatter), nil
+	default:
+		return nil, errors.New(fmt.Sprintf("Not suppported logger format: \"%s\"", format))
 	}
-
-	return <-installed
 }

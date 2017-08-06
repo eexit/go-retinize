@@ -1,8 +1,10 @@
 package resizer
 
 import (
-	"fmt"
+	"github.com/sirupsen/logrus"
 	"os/exec"
+	"reflect"
+	"strconv"
 )
 
 type sips struct {
@@ -24,12 +26,26 @@ func (ip *sips) IsInstalled() bool {
 	return true
 }
 
-func (ip *sips) WithWidth(img string, w int) error {
-	cmd := exec.Command(fmt.Sprintf("%s --resampleWidth=%d %s", ip.bin, w, img))
+func (ip *sips) ResampleWidth(logger logrus.FieldLogger, srcImgPath, destImgPath string, width int) bool {
+	logger = logger.WithFields(logrus.Fields{
+		"prefix": "image-processor",
+		"ip":     reflect.Indirect(reflect.ValueOf(ip)).Type().Name(),
+	})
 
-	if err := cmd.Run(); err != nil {
-		return err
+	params := []string{"--out", destImgPath, "--resampleWidth", strconv.Itoa(width), srcImgPath}
+	logger.WithFields(logrus.Fields{
+		"bin":    ip.bin,
+		"params": params,
+	}).Debug("Command issue")
+
+	cmd := exec.Command(ip.bin, params...)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		logger.WithError(err).Error("Command error")
+		return false
 	}
 
-	return nil
+	logger.WithField("output", string(output)).Debug("Command output")
+	return true
 }
